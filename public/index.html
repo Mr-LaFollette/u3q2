@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Complex Numbers Review | Algebra 2 Honors</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="card">
+    <header class="hero">
+      <h1>Complex Numbers Review</h1>
+      <p>Powers of i, adding, subtracting, multiplying, and dividing</p>
+      <p>Florida Algebra 2 Honors</p>
+    </header>
+
+    <!-- START -->
+    <section id="screen-start" aria-labelledby="start-title">
+      <h2 id="start-title" class="sr-only">Get started</h2>
+      <div class="notice">
+        <p><strong>How it works:</strong> Enter your name, choose your topics, and practice. Every problem is new, and topics you miss come up more often.</p>
+        <p>Your teacher can see your name, your score on each topic, and how long you practiced.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Who is practicing?</h3>
+        <div class="row two">
+          <div class="field">
+            <label for="name">First name and last initial</label>
+            <input type="text" id="name" maxlength="40" autocomplete="off" placeholder="Example: Jamie R">
+          </div>
+          <div class="field">
+            <label for="period">Class period</label>
+            <select id="period">
+              <option value="">Choose&hellip;</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option>
+              <option>5</option><option>6</option><option>7</option><option>8</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Choose your topics</h3>
+        <div class="topic-tools">
+          <button type="button" class="btn gray small" id="all-topics">Select all</button>
+          <button type="button" class="btn gray small" id="no-topics">Clear</button>
+        </div>
+        <div class="topics" id="topic-list"></div>
+      </div>
+
+      <p id="start-error" class="err" role="alert" hidden></p>
+      <div class="actions"><button type="button" class="btn" id="start-btn">Start practicing</button></div>
+    </section>
+
+    <!-- PRACTICE -->
+    <section id="screen-practice" hidden aria-labelledby="problem-heading">
+      <div class="stat-bar">
+        <h2 id="problem-heading">Problem 1</h2>
+        <p class="score" id="score">Score: 0 / 0</p>
+      </div>
+
+      <div class="panel problem-box">
+        <div class="topic-line">
+          <span class="chip" id="topic-name"></span>
+          <span class="chip std" id="topic-std"></span>
+        </div>
+        <p class="prompt" id="prompt"></p>
+        <div class="expr" id="expr" aria-live="polite"></div>
+      </div>
+
+      <form id="answer-form" autocomplete="off">
+        <label for="answer">Your answer</label>
+        <div class="answer-row">
+          <input type="text" id="answer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <button type="submit" class="btn" id="check-btn">Check answer</button>
+        </div>
+        <div class="keypad" id="keypad" aria-label="Symbol keypad"></div>
+      </form>
+
+      <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
+      <div id="hint-box" class="reveal hint" hidden></div>
+      <div id="solution-box" class="reveal solution" hidden></div>
+
+      <div class="actions">
+        <button type="button" class="btn yellow" id="hint-btn">Hint</button>
+        <button type="button" class="btn" id="solution-btn">Show solution</button>
+        <button type="button" class="btn green" id="next-btn">Next problem</button>
+      </div>
+
+      <div class="panel">
+        <h3>Your progress (correct on the first try)</h3>
+        <div class="progress" id="progress"></div>
+        <div class="actions" style="margin-bottom:0">
+          <button type="button" class="btn gray small" id="finish-btn">Finish and see results</button>
+        </div>
+      </div>
+
+      <div class="help">
+        <h3>How to type your answer</h3>
+        <ul>
+          <li>Write answers in <b>a + bi</b> form, like <b>3 &minus; 2i</b>. Use the letter <b>i</b>.</li>
+          <li>Fractions: type <b>3/5 + 4/5i</b> or <b>(3 + 4i)/5</b>. Reduce every fraction.</li>
+          <li>Answers like <b>&minus;1</b>, <b>i</b>, or <b>7i</b> are fine when one part is zero.</li>
+          <li>No i in the denominator, no i&sup2;, and no square roots of negatives in your final answer.</li>
+          <li>Give exact answers, not decimals.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section id="screen-results" hidden aria-labelledby="results-title">
+      <div class="stat-bar"><h2 id="results-title">Your results</h2><p class="score" id="results-name"></p></div>
+      <div class="results-summary" id="results-summary"></div>
+      <div class="panel">
+        <h3>By topic</h3>
+        <div class="progress" id="results-topics"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn green" id="keep-btn">Keep practicing</button>
+        <button type="button" class="btn gray" id="change-btn">Change topics</button>
+      </div>
+    </section>
+
+    <footer class="note">Standard: Florida B.E.S.T. MA.912.NSO.2.1 (add, subtract, multiply and divide complex numbers)</footer>
+  </main>
+
+  <script src="js/engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

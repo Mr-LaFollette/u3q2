@@ -1,0 +1,11 @@
+{
+  "name": "complex-review",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Algebra 2 Honors complex numbers review app with teacher dashboard",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.6",
+    "@netlify/functions": "^6.0.3"
+  }
+}

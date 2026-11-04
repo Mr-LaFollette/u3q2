@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teacher Dashboard | Complex Numbers Review</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="card wide">
+    <header class="hero">
+      <h1>Teacher Dashboard</h1>
+      <p>Complex Numbers Review usage</p>
+    </header>
+
+    <section id="login">
+      <div class="panel" style="max-width:26rem;margin:0 auto">
+        <h3>Enter the dashboard password</h3>
+        <form id="login-form">
+          <div class="field">
+            <label for="pw">Password</label>
+            <input type="password" id="pw" autocomplete="current-password">
+          </div>
+          <p id="login-error" class="err" role="alert" hidden></p>
+          <button class="btn" type="submit">View dashboard</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="dash" hidden>
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="Search by name" aria-label="Search by name">
+        <select id="f-period" aria-label="Filter by period"><option value="">All periods</option></select>
+        <label style="font-weight:400"><input type="checkbox" id="hide-empty" checked> Hide visits with no practice</label>
+        <span style="flex:1"></span>
+        <button class="btn small" id="refresh">Refresh</button>
+        <button class="btn small green" id="csv">Download CSV</button>
+        <button class="btn small gray" id="clear-all">Delete all records</button>
+        <button class="btn small gray" id="logout">Sign out</button>
+      </div>
+      <p id="updated" style="color:#6b7280;margin:.25rem 0 1rem"></p>
+
+      <div class="results-summary" id="summary"></div>
+
+      <div class="panel">
+        <h3>Class results by topic (correct on first try)</h3>
+        <div class="progress" id="by-topic"></div>
+      </div>
+
+      <h3>Students</h3>
+      <p style="color:#4b5563;margin-top:0">Click a row to see that student's topics. Click a column heading to sort.</p>
+      <div class="table-wrap">
+        <table class="data" id="tbl">
+          <thead><tr>
+            <th data-k="name">Student</th><th data-k="period">Period</th><th data-k="started">Started</th>
+            <th data-k="active" class="num">Time active</th><th data-k="n" class="num">Problems</th>
+            <th data-k="pct" class="num">First-try %</th><th data-k="status">Status</th><th>Weakest topic</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="empty" style="display:none;color:#4b5563">No records match yet. Records appear as students use the page.</p>
+    </section>
+  </main>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const API = '/api/admin';
+  const TOPICS = {
+    'powers-i': 'Simplify powers of i', 'add-sub': 'Add and subtract', 'multiply': 'Multiply',
+    'div-mono': 'Divide by a monomial', 'div-binom': 'Divide by a binomial'
+  };
+  const PW_KEY = 'cxpw';
+  let password = sessionStorage.getItem(PW_KEY) || '';
+  let rows = [];
+  let sortKey = 'started', sortDir = -1;
+  const open = new Set();
+
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) : null);
+  function fmtTime(sec) {
+    sec = Math.round(sec || 0);
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m >= 60 ? Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm' : m + ':' + String(s).padStart(2, '0');
+  }
+  const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+
+  function summarize(s) {
+    const log = s.log || [];
+    const by = {};
+    Object.keys(TOPICS).forEach((k) => { by[k] = { n: 0, first: 0, ok: 0 }; });
+    log.forEach((e) => { const b = by[e.topic]; if (b) { b.n++; if (e.firstTry) b.first++; if (e.correct) b.ok++; } });
+    const n = log.length, first = log.filter((e) => e.firstTry).length;
+    let weakest = '', worst = 2;
+    Object.keys(by).forEach((k) => { const b = by[k]; if (b.n >= 2) { const r = b.first / b.n; if (r < worst) { worst = r; weakest = TOPICS[k] + ' (' + Math.round(r * 100) + '%)'; } } });
+    let status = 'Visit only';
+    if (s.name) status = s.status === 'finished' ? 'Finished' : n > 0 ? 'In progress' : 'Started';
+    return { s, by, n, first, pct: pct(first, n), weakest, status, name: s.name || '(no name)', period: s.period || '', started: s.startedAt || '', active: s.activeSeconds || 0 };
+  }
+
+  async function load() {
+    $('login-error').hidden = true;
+    const res = await fetch(API, { headers: { Authorization: 'Bearer ' + password }, cache: 'no-store' });
+    if (res.status === 401 || res.status === 500) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || 'Could not sign in.');
+    }
+    if (!res.ok) throw new Error('The dashboard could not load (error ' + res.status + '). If you are testing locally, run it with "netlify dev".');
+    const data = await res.json();
+    rows = (data.sessions || []).map(summarize);
+    $('updated').textContent = 'Updated ' + new Date(data.generatedAt).toLocaleTimeString() + '. Times are shown in this browser\'s time zone.';
+    const periods = Array.from(new Set(rows.map((r) => r.period).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const sel = $('f-period'), cur = sel.value;
+    sel.innerHTML = '';
+    [['', 'All periods']].concat(periods.map((p) => [p, 'Period ' + p])).forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
+    sel.value = cur;
+    render();
+  }
+
+  function visible() {
+    const q = $('search').value.trim().toLowerCase(), per = $('f-period').value, hide = $('hide-empty').checked;
+    return rows.filter((r) => (!q || r.name.toLowerCase().includes(q)) && (!per || r.period === per) && (!hide || r.n > 0));
+  }
+
+  function bar(p, n) {
+    const d = document.createElement('div'); d.className = 'bar';
+    const f = document.createElement('span'); f.style.width = (n ? Math.max(p, 3) : 0) + '%';
+    if (n >= 3) f.className = p >= 85 ? 'good' : p < 60 ? 'low' : '';
+    d.appendChild(f); return d;
+  }
+
+  function render() {
+    const students = rows.filter((r) => r.s.name);
+    const practiced = rows.filter((r) => r.n > 0);
+    const finished = rows.filter((r) => r.status === 'Finished');
+    const totalN = practiced.reduce((a, r) => a + r.n, 0), totalFirst = practiced.reduce((a, r) => a + r.first, 0);
+    const times = practiced.map((r) => r.active).sort((a, b) => a - b);
+    const median = times.length ? times[Math.floor(times.length / 2)] : 0;
+    const cards = [[rows.length, 'Page visits'], [students.length, 'Entered a name'], [practiced.length, 'Practiced'], [finished.length, 'Finished'],
+      [totalN ? pct(totalFirst, totalN) + '%' : '\u2013', 'Class first-try %'], [fmtTime(median), 'Median time']];
+    $('summary').innerHTML = '';
+    cards.forEach(([v, l]) => {
+      const d = document.createElement('div'); d.className = 'stat';
+      const a = document.createElement('div'); a.className = 'n'; a.textContent = v;
+      const b = document.createElement('div'); b.className = 'l'; b.textContent = l;
+      d.append(a, b); $('summary').appendChild(d);
+    });
+
+    const bt = $('by-topic'); bt.innerHTML = '';
+    Object.keys(TOPICS).forEach((k) => {
+      let n = 0, first = 0;
+      practiced.forEach((r) => { n += r.by[k].n; first += r.by[k].first; });
+      const p = pct(first, n) || 0;
+      const row = document.createElement('div'); row.className = 'prow';
+      const nm = document.createElement('div'); nm.className = 'name';
+      const l = document.createElement('span'); l.textContent = TOPICS[k];
+      const r = document.createElement('span'); r.textContent = n ? first + ' of ' + n + ' (' + p + '%)' : 'No attempts yet';
+      nm.append(l, r); row.append(nm, bar(p, n)); bt.appendChild(row);
+    });
+
+    const list = visible().sort((a, b) => {
+      const va = a[sortKey], vb = b[sortKey];
+      const x = va == null ? -1 : va, y = vb == null ? -1 : vb;
+      return (typeof x === 'string' ? x.localeCompare(y, undefined, { numeric: true }) : x - y) * sortDir;
+    });
+    const tb = $('tbl').querySelector('tbody'); tb.innerHTML = '';
+    $('empty').style.display = list.length ? 'none' : 'block';
+    list.forEach((r) => {
+      const tr = document.createElement('tr'); tr.className = 'sess';
+      const cells = [r.name, r.period, fmtDate(r.started), fmtTime(r.active), String(r.n), r.pct == null ? '\u2013' : r.pct + '%', r.status, r.weakest || '\u2013'];
+      cells.forEach((c, i) => { const td = document.createElement('td'); if (i >= 3 && i <= 5) td.className = 'num'; td.textContent = c; tr.appendChild(td); });
+      const del = document.createElement('td');
+      const b = document.createElement('button'); b.className = 'btn small gray'; b.textContent = 'Delete'; b.setAttribute('aria-label', 'Delete record for ' + r.name);
+      b.onclick = async (ev) => { ev.stopPropagation(); if (!confirm('Delete this record for ' + r.name + '?')) return; await fetch(API + '?id=' + encodeURIComponent(r.s.id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + password } }); load(); };
+      del.appendChild(b); tr.appendChild(del);
+      tr.onclick = () => { open.has(r.s.id) ? open.delete(r.s.id) : open.add(r.s.id); render(); };
+      tb.appendChild(tr);
+      if (open.has(r.s.id)) {
+        const dt = document.createElement('tr'); dt.className = 'detail';
+        const td = document.createElement('td'); td.colSpan = 9;
+        const wrap = document.createElement('div'); wrap.className = 'progress';
+        Object.keys(TOPICS).forEach((k) => {
+          const b2 = r.by[k]; if (!b2.n) return;
+          const row = document.createElement('div'); row.className = 'prow';
+          const nm = document.createElement('div'); nm.className = 'name';
+          const l = document.createElement('span'); l.textContent = TOPICS[k];
+          const rr = document.createElement('span'); rr.textContent = b2.first + ' of ' + b2.n + ' first try, ' + b2.ok + ' eventually correct';
+          nm.append(l, rr); row.append(nm, bar(pct(b2.first, b2.n), b2.n)); wrap.appendChild(row);
+        });
+        const lg = r.s.log || [];
+        const note = document.createElement('p'); note.style.margin = '.75rem 0 0';
+        note.textContent = 'Hints used: ' + lg.filter((e) => e.hint).length + '. Solutions viewed: ' + lg.filter((e) => e.solution).length + '. Skipped: ' + lg.filter((e) => e.skipped).length + '. Last active: ' + fmtDate(r.s.lastActiveAt) + '.';
+        td.append(wrap.childNodes.length ? wrap : document.createTextNode('No problems completed yet.'), note);
+        dt.appendChild(td); tb.appendChild(dt);
+      }
+    });
+  }
+
+  function csv() {
+    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const keys = Object.keys(TOPICS);
+    const head = ['Name', 'Period', 'Started', 'Last active', 'Minutes active', 'Status', 'Problems', 'First try correct', 'First try %']
+      .concat(keys.map((k) => TOPICS[k] + ' (first try / attempted)'));
+    const lines = [head.map(esc).join(',')];
+    visible().forEach((r) => {
+      lines.push([r.name, r.period, r.s.startedAt, r.s.lastActiveAt, (r.active / 60).toFixed(1), r.status, r.n, r.first, r.pct == null ? '' : r.pct]
+        .concat(keys.map((k) => r.by[k].n ? r.by[k].first + '/' + r.by[k].n : '')).map(esc).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'complex-review-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function signIn() {
+    try { await load(); sessionStorage.setItem(PW_KEY, password); $('login').hidden = true; $('dash').hidden = false; }
+    catch (e) { sessionStorage.removeItem(PW_KEY); const el = $('login-error'); el.textContent = e.message; el.hidden = false; $('login').hidden = false; $('dash').hidden = true; }
+  }
+
+  $('login-form').onsubmit = (e) => { e.preventDefault(); password = $('pw').value; signIn(); };
+  $('refresh').onclick = () => load().catch((e) => alert(e.message));
+  $('csv').onclick = csv;
+  $('logout').onclick = () => { sessionStorage.removeItem(PW_KEY); password = ''; location.reload(); };
+  $('clear-all').onclick = async () => {
+    if (!confirm('Permanently delete ALL student records? This cannot be undone. Download the CSV first if you want a copy.')) return;
+    await fetch(API + '?all=true', { method: 'DELETE', headers: { Authorization: 'Bearer ' + password } });
+    load();
+  };
+  ['search', 'f-period', 'hide-empty'].forEach((id) => $(id).addEventListener('input', render));
+  document.querySelectorAll('th[data-k]').forEach((th) => { th.onclick = () => { const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : (k === 'name' || k === 'period' ? 1 : -1); sortKey = k; render(); }; });
+  if (password) signIn();
+})();
+</script>
+</body>
+</html>
